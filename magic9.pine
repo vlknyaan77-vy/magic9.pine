@@ -211,8 +211,10 @@ if lb_mode == "Manuel (Ofset)"
 var FiltState fs_p = FiltState.new()
 var FiltState fs_v = FiltState.new()
 
-is_p_anc = (bar_index == settled_p_idx) or (ta.change(settled_p_idx) != 0)
-is_v_anc = (bar_index == settled_v_idx) or (ta.change(settled_v_idx) != 0)
+p_anc_ch = ta.change(settled_p_idx)
+v_anc_ch = ta.change(settled_v_idx)
+is_p_anc = (bar_index == settled_p_idx) or (nz(p_anc_ch) != 0)
+is_v_anc = (bar_index == settled_v_idx) or (nz(v_anc_ch) != 0)
 float init_p_val = high[math.max(0, bar_index - nz(settled_p_idx, bar_index))]
 float init_v_val = low[math.max(0, bar_index - nz(settled_v_idx, bar_index))]
 
@@ -247,10 +249,10 @@ int bars_v_p_dn     = ta.barssince(cross_v_vs_p_dn)
 [htf_v_vnext_up, htf_v_vnext_dn, htf_v_p_up, htf_v_p_dn, htf_b_vv_up, htf_b_vv_dn, htf_b_vp_up, htf_b_vp_dn] = request.security(syminfo.tickerid, test_tf, [cross_v_vs_vnext_up, cross_v_vs_vnext_dn, cross_v_vs_p_up, cross_v_vs_p_dn, bars_v_vnext_up, bars_v_vnext_dn, bars_v_p_up, bars_v_p_dn], lookahead=barmerge.lookahead_on)
 
 // Visualization on Chart
-plotshape(htf_v_vnext_up, "HTF V-VNext Cross Up", shape.triangleup, location.belowbar, color.green, size=size.small, title="HTF V-VNext Up")
-plotshape(htf_v_vnext_dn, "HTF V-VNext Cross Down", shape.triangledown, location.abovebar, color.green, size=size.small, title="HTF V-VNext Down")
-plotshape(htf_v_p_up, "HTF V-P Cross Up", shape.triangleup, location.belowbar, color.yellow, size=size.small, title="HTF V-P Up")
-plotshape(htf_v_p_dn, "HTF V-P Cross Down", shape.triangledown, location.abovebar, color.yellow, size=size.small, title="HTF V-P Down")
+plotshape(htf_v_vnext_up, shape=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="HTF V-VNext Up")
+plotshape(htf_v_vnext_dn, shape=shape.triangledown, location=location.abovebar, color=color.green, size=size.small, title="HTF V-VNext Down")
+plotshape(htf_v_p_up, shape=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.small, title="HTF V-P Up")
+plotshape(htf_v_p_dn, shape=shape.triangledown, location=location.abovebar, color=color.yellow, size=size.small, title="HTF V-P Down")
 
 // Visualization
 var polyline[] p_pl = array.new<polyline>(0)
