@@ -313,37 +313,11 @@ if show_table and barstate.islast
     p_label = p_gamma_drawer_sel == "Çekmece 1" ? "G1" : (p_gamma_drawer_sel == "Çekmece 2" ? "G2" : (p_gamma_drawer_sel == "Çekmece 3" ? "G3" : (p_gamma_drawer_sel == "Çekmece 4" ? "G4" : "G5")))
     v_label = v_gamma_drawer_sel == "Çekmece 1" ? "G1" : (v_gamma_drawer_sel == "Çekmece 2" ? "G2" : (v_gamma_drawer_sel == "Çekmece 3" ? "G3" : (v_gamma_drawer_sel == "Çekmece 4" ? "G4" : "G5")))
     
-    str_p_full = ""
-    if show_clusters and array.size(p_g_prevs) > 0
-        for k = array.size(p_g_prevs) - 1 to 0
-            v = array.get(p_g_prevs, k)
-            if not na(v)
-                str_p_full += str.tostring(v, "#.###") + ", "
-    str_p_full += "[" + str.tostring(p_g_main, "#.###") + "]"
-    if show_clusters and array.size(p_g_nexts) > 0
-        for k = 0 to array.size(p_g_nexts) - 1
-            v = array.get(p_g_nexts, k)
-            if not na(v)
-                str_p_full += ", " + str.tostring(v, "#.###")
-
-    str_v_full = ""
-    if show_clusters and array.size(v_g_prevs) > 0
-        for k = array.size(v_g_prevs) - 1 to 0
-            v = array.get(v_g_prevs, k)
-            if not na(v)
-                str_v_full += str.tostring(v, "#.###") + ", "
-    str_v_full += "[" + str.tostring(v_g_main, "#.###") + "]"
-    if show_clusters and array.size(v_g_nexts) > 0
-        for k = 0 to array.size(v_g_nexts) - 1
-            v = array.get(v_g_nexts, k)
-            if not na(v)
-                str_v_full += ", " + str.tostring(v, "#.###")
-
-    table.cell(info_tab, 0, 2, "Tepe Cluster", bgcolor=color.new(color.gray, 90), text_color=c_txt)
-    table.cell(info_tab, 1, 2, p_label + ": " + str_p_full, bgcolor=color.new(color.gray, 90), text_color=c_txt)
+    table.cell(info_tab, 0, 2, "Ana Tepe Filtresi", bgcolor=color.new(color.gray, 90), text_color=c_txt)
+    table.cell(info_tab, 1, 2, p_label + ": " + str.tostring(p_g_main, "#.###"), bgcolor=color.new(color.gray, 90), text_color=c_txt)
     
-    table.cell(info_tab, 0, 3, "Dip Cluster", bgcolor=color.new(color.gray, 90), text_color=c_txt)
-    table.cell(info_tab, 1, 3, v_label + ": " + str_v_full, bgcolor=color.new(color.gray, 90), text_color=c_txt)
+    table.cell(info_tab, 0, 3, "Ana Dip Filtresi", bgcolor=color.new(color.gray, 90), text_color=c_txt)
+    table.cell(info_tab, 1, 3, v_label + ": " + str.tostring(v_g_main, "#.###"), bgcolor=color.new(color.gray, 90), text_color=c_txt)
     
     table.cell(info_tab, 0, 4, "ATR Period", bgcolor=color.new(color.gray, 90), text_color=c_txt)
     table.cell(info_tab, 1, 4, str.tostring(atr_per, "#.###") + (auto_atr ? " (Oto)" : ""), bgcolor=color.new(color.gray, 90), text_color=c_txt)
