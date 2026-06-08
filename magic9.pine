@@ -7,6 +7,7 @@ string GRP_FILT_P = "📏 Tepe Filtre Ayarları / Peak Filter Settings"
 string GRP_FILT_V = "📏 Dip Filtre Ayarları / Valley Filter Settings"
 string GRP_VIS  = "🎨 Görsel Ayarlar / Visual Settings"
 string GRP_TAB  = "📊 Tablo Ayarları / Table Settings"
+string GRP_ENG  = "⚙️ Kesişim Motoru / Cross Engine"
 
 // --- GİRDİLER / INPUTS ---
 lb_mode        = input.string("Manuel", "Tarama Modu / Lookback Mode", options=["Manuel", "Otomatik (Hassasiyet)", "Global (Maksimum)", "Manuel (Ofset)"], group=GRP_AUTO)
@@ -50,6 +51,9 @@ filt_width     = input.int(2, "Çizgi Kalınlığı / Line Width", minval=1, max
 show_table     = input.bool(true, "Bilgi Tablosunu Göster / Show Info Table", group=GRP_TAB)
 table_pos      = input.string("Top Right", "Tablo Konumu / Table Position", options=["Top Right", "Bottom Right", "Top Left", "Bottom Left", "Middle Right"], group=GRP_TAB)
 
+show_engine    = input.bool(true, "Motoru Aktif Et / Enable Cross Engine", group=GRP_ENG)
+test_tf        = input.timeframe("5", "Test Zaman Dilimi / Test Timeframe", group=GRP_ENG)
+
 // --- YARDIMCI FONKSİYONLAR / HELPERS ---
 f_fill_cluster(float main_val, float step) =>
     float[] res = array.new_float(0)
@@ -63,7 +67,7 @@ f_kama_atr(float src, float n) =>
     float n_eff = math.max(0.01, n)
     int n_i = int(math.floor(n_eff))
     float frac = n_eff - n_i
-    
+
     // Volatility calculation without a loop
     // Note: ta.sma must be called on every bar to maintain buffers
     float v_diff = math.abs(src - nz(src[1], src))
@@ -95,14 +99,17 @@ type FiltState
     float rfilt = na
 
 method upd_filt(FiltState s, float h, float l, float r, float init_val, bool reset) =>
+    float res = na
     if reset or na(s.rfilt)
-        s.rfilt := init_val
+        res := init_val
     else
-        if h - r > s.rfilt
-            s.rfilt := h - r
-        if l + r < s.rfilt
-            s.rfilt := l + r
-    s.rfilt
+        res := s.rfilt
+        if h - r > res
+            res := h - r
+        if l + r < res
+            res := l + r
+    s.rfilt := res
+    res
 
 // --- HESAPLAMA AKIŞI / CALCULATION FLOW ---
 float tr = ta.tr(true)
@@ -161,10 +168,11 @@ if barstate.islast
     p_g_nexts := f_fill_cluster(p_g_main, p_step)
     
     v_g_prevs := array.new_float(0)
-    v_step = v_gamma_drawer_sel == "Çekmece 1" ? 1.125 : v_gamma_drawer_sel == "Çekmece 2" ? 2.25 : v_gamma_drawer_sel == "Çekmece 3" ? 4.5 : v_gamma_drawer_sel == "Çekmece 4" ? 9.0 : 0.81
-    v_g_nexts := f_fill_cluster(v_g_main, v_step)
+    v_s_tmp = v_gamma_drawer_sel == "Çekmece 1" ? 1.125 : v_gamma_drawer_sel == "Çekmece 2" ? 2.25 : v_gamma_drawer_sel == "Çekmece 3" ? 4.5 : v_gamma_drawer_sel == "Çekmece 4" ? 9.0 : 0.81
+    v_g_nexts := f_fill_cluster(v_g_main, v_s_tmp)
 
 // 5. Final Effective Gammas & Sizes
+float v_step = v_gamma_drawer_sel == "Çekmece 1" ? 1.125 : v_gamma_drawer_sel == "Çekmece 2" ? 2.25 : v_gamma_drawer_sel == "Çekmece 3" ? 4.5 : v_gamma_drawer_sel == "Çekmece 4" ? 9.0 : 0.81
 float p_gamma_val = p_gamma_val_manual
 float v_gamma_val = v_gamma_val_manual
 float cur_p_sz = cur_sz_unit * p_gamma_val
@@ -304,7 +312,7 @@ if barstate.islast
 // Table
 if show_table and barstate.islast
     pos = table_pos == "Top Right" ? position.top_right : table_pos == "Bottom Right" ? position.bottom_right : table_pos == "Top Left" ? position.top_left : table_pos == "Bottom Left" ? position.bottom_left : position.middle_right
-    var table info_tab = table.new(pos, 2, 5, border_width=1, border_color=color.gray, frame_width=1, frame_color=color.gray)
+    var table info_tab = table.new(pos, 2, 6, border_width=1, border_color=color.gray, frame_width=1, frame_color=color.gray)
     c_bg = color.new(color.gray, 80), c_txt = color.white
     table.cell(info_tab, 0, 0, "💎 Volcanic", bgcolor=color.new(color.black, 40), text_color=color.yellow)
     table.cell(info_tab, 1, 0, "", bgcolor=color.new(color.black, 40))
@@ -321,6 +329,17 @@ if show_table and barstate.islast
     
     table.cell(info_tab, 0, 4, "ATR Period", bgcolor=color.new(color.gray, 90), text_color=c_txt)
     table.cell(info_tab, 1, 4, str.tostring(atr_per, "#.###") + (auto_atr ? " (Oto)" : ""), bgcolor=color.new(color.gray, 90), text_color=c_txt)
+
+    if show_engine
+        table.cell(info_tab, 0, 5, "HTF Cross (" + test_tf + ")", bgcolor=color.new(color.blue, 80), text_color=color.white)
+        string engine_res = ""
+        if htf_v_vnext_up or htf_v_vnext_dn
+            engine_res += "V-VNext: " + (htf_v_vnext_up ? "↑ " : "↓ ") + str.tostring(htf_v_vnext_up ? htf_b_vv_up : htf_b_vv_dn) + " bar"
+        if htf_v_p_up or htf_v_p_dn
+            if engine_res != ""
+                engine_res += " | "
+            engine_res += "V-P: " + (htf_v_p_up ? "↑ " : "↓ ") + str.tostring(htf_v_p_up ? htf_b_vp_up : htf_b_vp_dn) + " bar"
+        table.cell(info_tab, 1, 5, engine_res == "" ? "Kesişim Yok" : engine_res, bgcolor=color.new(color.blue, 80), text_color=color.white)
 
 var label lp = na
 var label lv = na
@@ -358,3 +377,62 @@ if barstate.islast
 
 alertcondition(settled_p_idx != settled_p_idx[1], "Yeni Tepe", "Otomatik çapa yeni bir tepe noktasına sabitlendi!")
 alertcondition(settled_v_idx != settled_v_idx[1], "Yeni Dip", "Otomatik çapa yeni bir dip noktasına sabitlendi!")
+
+// --- CROSS ENGINE LOGIC ---
+f_cross_engine() =>
+    // We need to recalculate the main filters for the HTF
+    // Since we are inside a function, we must use local variables and avoid 'var'
+    // To ensure stability, this function should be called within request.security
+
+    // 1. Basic properties
+    _tr = ta.tr(true)
+    _atr_per_auto = (timeframe.in_seconds() / 60.0) * atr_mult
+    _atr_per = math.min(4990.0, auto_atr ? _atr_per_auto : nz(str.tonumber(atr_opt), 8.1))
+
+    // Using a simple SMA for ATR in HTF to keep it fast and compatible with security()
+    // f_kama_atr might be too complex for a deep MTF security call if called many times
+    _sz_unit = ta.sma(_tr, int(math.max(1, _atr_per)))
+
+    _p_gamma = p_gamma_drawer_sel == "Çekmece 1" ? p_gamma_opt : p_gamma_drawer_sel == "Çekmece 2" ? p_gamma_opt_2 : p_gamma_drawer_sel == "Çekmece 3" ? p_gamma_opt_3 : p_gamma_drawer_sel == "Çekmece 4" ? p_gamma_opt_4 : p_gamma_opt_5
+    _v_gamma = v_gamma_drawer_sel == "Çekmece 1" ? v_gamma_opt : v_gamma_drawer_sel == "Çekmece 2" ? v_gamma_opt_2 : v_gamma_drawer_sel == "Çekmece 3" ? v_gamma_opt_3 : v_gamma_drawer_sel == "Çekmece 4" ? v_gamma_opt_4 : v_gamma_opt_5
+    _v_step = v_gamma_drawer_sel == "Çekmece 1" ? 1.125 : v_gamma_drawer_sel == "Çekmece 2" ? 2.25 : v_gamma_drawer_sel == "Çekmece 3" ? 4.5 : v_gamma_drawer_sel == "Çekmece 4" ? 9.0 : 0.81
+
+    // Calculation of filters (non-persistent state versions for MTF)
+    // We use a simplified version of the filter for MTF detection
+    _v_main = high
+    _v_next = high
+    _p_main = high
+
+    // State-like behavior using ta.cum or ta.ema for HTF is tricky
+    // For the engine, we will focus on the cross of the series
+    // In MTF context, we'll use the values calculated in the script's main flow
+    [last_f_v, last_f_p, cur_v_sz, cur_p_sz, v_step]
+
+// Since request.security calls are expensive, we calculate the targets in the current TF
+// and then potentially fetch them from HTF.
+float v_next_gamma = v_gamma_val + v_step
+float cur_v_next_sz = cur_sz_unit * v_next_gamma
+
+// Next Layer Filter State
+var FiltState fs_v_next = FiltState.new()
+float last_f_v_next = fs_v_next.upd_filt(high, low, cur_v_next_sz, init_v_val, is_v_anc)
+
+// Cross Detections (Current TF)
+bool cross_v_vs_vnext_up = ta.crossover(last_f_v, last_f_v_next)
+bool cross_v_vs_vnext_dn = ta.crossunder(last_f_v, last_f_v_next)
+bool cross_v_vs_p_up     = ta.crossover(last_f_v, last_f_p)
+bool cross_v_vs_p_dn     = ta.crossunder(last_f_v, last_f_p)
+
+int bars_v_vnext_up = ta.barssince(cross_v_vs_vnext_up)
+int bars_v_vnext_dn = ta.barssince(cross_v_vs_vnext_dn)
+int bars_v_p_up     = ta.barssince(cross_v_vs_p_up)
+int bars_v_p_dn     = ta.barssince(cross_v_vs_p_dn)
+
+// HTF Calculations
+[htf_v_vnext_up, htf_v_vnext_dn, htf_v_p_up, htf_v_p_dn, htf_b_vv_up, htf_b_vv_dn, htf_b_vp_up, htf_b_vp_dn] = request.security(syminfo.tickerid, test_tf, [cross_v_vs_vnext_up, cross_v_vs_vnext_dn, cross_v_vs_p_up, cross_v_vs_p_dn, bars_v_vnext_up, bars_v_vnext_dn, bars_v_p_up, bars_v_p_dn], lookahead=barmerge.lookahead_on)
+
+// Visualization on Chart
+plotshape(htf_v_vnext_up, "HTF V-VNext Cross Up", shape.triangleup, location.belowbar, color.green, size=size.small, title="HTF V-VNext Up")
+plotshape(htf_v_vnext_dn, "HTF V-VNext Cross Down", shape.triangledown, location.abovebar, color.green, size=size.small, title="HTF V-VNext Down")
+plotshape(htf_v_p_up, "HTF V-P Cross Up", shape.triangleup, location.belowbar, color.yellow, size=size.small, title="HTF V-P Up")
+plotshape(htf_v_p_dn, "HTF V-P Cross Down", shape.triangledown, location.abovebar, color.yellow, size=size.small, title="HTF V-P Down")
