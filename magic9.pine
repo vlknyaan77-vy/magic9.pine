@@ -59,23 +59,22 @@ f_fill_cluster(float main_val, float step) =>
             array.push(res, val)
     res
 
-f_kama_atr(float src, float n) =>
+f_kama_atr(float src, float n, bool active) =>
     float n_eff = math.max(0.01, n)
-    int n_i = int(math.ceil(n_eff))
-    int loop_len = math.min(n_i, bar_index)
+    int n_i = int(math.floor(n_eff))
+    float frac = n_eff - n_i
     
-    // Volatility calculation with fractional support
-    float vol = 0.0
-    if loop_len > 0
-        for i = 0 to loop_len - 1
-            float w = (i + 1) <= n_eff ? 1.0 : (n_eff - i)
-            vol += math.abs(src[i] - nz(src[i+1], src[i])) * w
+    // Volatility calculation without a loop
+    // Note: ta.sum must be called on every bar
+    float v_diff = math.abs(src - nz(src[1], src))
+    float vol_sum = ta.sum(v_diff, math.max(1, n_i))
+
+    float vol = vol_sum
+    if frac > 0
+        vol := vol + math.abs(nz(src[n_i], src) - nz(src[n_i+1], src)) * frac
     
     // Direction calculation with interpolation
-    int f_n = math.min(int(math.floor(n_eff)), bar_index)
-    int c_n = math.min(int(math.ceil(n_eff)), bar_index)
-    float frac = n_eff - math.floor(n_eff)
-    float val_n = f_n == c_n ? nz(src[f_n], src) : nz(src[f_n], src) * (1.0 - frac) + nz(src[c_n], src) * frac
+    float val_n = n_i == 0 ? src : (frac == 0 ? nz(src[n_i], src) : nz(src[n_i], src) * (1.0 - frac) + nz(src[n_i+1], src) * frac)
     float dir = math.abs(src - val_n)
     
     float er = vol == 0 ? 0 : math.min(1.0, dir / vol)
@@ -107,8 +106,14 @@ method upd_filt(FiltState s, float h, float l, float r, float init_val, bool res
 // --- HESAPLAMA AKIŞI / CALCULATION FLOW ---
 float tr = ta.tr(true)
 
-float rng_per   = atr_per
-float cur_sz_unit = f_kama_atr(tr, rng_per)
+// Optimization: Only calculate heavy parts near the anchor area
+bool is_in_range = (lb_mode == "Global (Maksimum)") or
+                  (lb_mode == "Zaman (Manuel Çapa)" and time >= math.min(p_anchor_time, v_anchor_time) - 86400000) or
+                  (bar_index >= chart.last_bar_index - lb_input - 100)
+
+float rng_per   = is_in_range ? atr_per : na
+float cur_sz_unit_raw = f_kama_atr(tr, nz(rng_per, 8.1), is_in_range)
+float cur_sz_unit = is_in_range ? cur_sz_unit_raw : 0.0
 max_bars_back(cur_sz_unit, 5000)
 max_bars_back(high, 5000)
 max_bars_back(low, 5000)
@@ -182,8 +187,9 @@ f_get_settled_idx(bool is_peak, int lb_mode_idx, int lb_val, float prev_f, float
     res_idx
 
 int lb_mode_idx = lb_mode == "Global (Maksimum)" ? 0 : 1
-settled_p_idx := lb_mode == "Zaman (Manuel Çapa)" ? na : f_get_settled_idx(true, lb_mode_idx, lb_input, last_f_p, cur_p_sz, settled_p_idx, high, low, close, hb_4990, lb_4990, hb_auto, lb_auto)
-settled_v_idx := lb_mode == "Zaman (Manuel Çapa)" ? na : f_get_settled_idx(false, lb_mode_idx, lb_input, last_f_v, cur_v_sz, settled_v_idx, high, low, close, hb_4990, lb_4990, hb_auto, lb_auto)
+if is_in_range
+    settled_p_idx := lb_mode == "Zaman (Manuel Çapa)" ? na : f_get_settled_idx(true, lb_mode_idx, lb_input, last_f_p, cur_p_sz, settled_p_idx, high, low, close, hb_4990, lb_4990, hb_auto, lb_auto)
+    settled_v_idx := lb_mode == "Zaman (Manuel Çapa)" ? na : f_get_settled_idx(false, lb_mode_idx, lb_input, last_f_v, cur_v_sz, settled_v_idx, high, low, close, hb_4990, lb_4990, hb_auto, lb_auto)
 
 if lb_mode == "Zaman (Manuel Çapa)"
     var int p_time_idx = na
