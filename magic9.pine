@@ -65,9 +65,10 @@ f_kama_atr(float src, float n, bool active) =>
     float frac = n_eff - n_i
     
     // Volatility calculation without a loop
-    // Note: ta.sum must be called on every bar
+    // Note: ta.sma must be called on every bar to maintain buffers
     float v_diff = math.abs(src - nz(src[1], src))
-    float vol_sum = ta.sum(v_diff, math.max(1, n_i))
+    int length = math.max(1, n_i)
+    float vol_sum = ta.sma(v_diff, length) * length
 
     float vol = vol_sum
     if frac > 0
