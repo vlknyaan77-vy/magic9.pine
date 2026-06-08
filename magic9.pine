@@ -59,7 +59,7 @@ f_fill_cluster(float main_val, float step) =>
             array.push(res, val)
     res
 
-f_kama_atr(float src, float n, bool active) =>
+f_kama_atr(float src, float n) =>
     float n_eff = math.max(0.01, n)
     int n_i = int(math.floor(n_eff))
     float frac = n_eff - n_i
@@ -107,13 +107,16 @@ method upd_filt(FiltState s, float h, float l, float r, float init_val, bool res
 // --- HESAPLAMA AKIŞI / CALCULATION FLOW ---
 float tr = ta.tr(true)
 
-// Optimization: Only calculate heavy parts near the anchor area
+int lb_input_val = lb_mode == "Global (Maksimum)" ? 4990 : lb_mode == "Otomatik (Hassasiyet)" ? lb_sens * 81 : auto_lookback
+
+// Calculation of is_in_range without last_bar_index dependency
+// Using timenow to estimate the current bar position relative to history
 bool is_in_range = (lb_mode == "Global (Maksimum)") or
                   (lb_mode == "Zaman (Manuel Çapa)" and time >= math.min(p_anchor_time, v_anchor_time) - 86400000) or
-                  (bar_index >= chart.last_bar_index - lb_input - 100)
+                  (timenow - time < (lb_input_val + 500) * timeframe.in_seconds() * 1000)
 
-float rng_per   = is_in_range ? atr_per : na
-float cur_sz_unit_raw = f_kama_atr(tr, nz(rng_per, 8.1), is_in_range)
+float rng_per   = atr_per
+float cur_sz_unit_raw = f_kama_atr(tr, nz(rng_per, 8.1))
 float cur_sz_unit = is_in_range ? cur_sz_unit_raw : 0.0
 max_bars_back(cur_sz_unit, 5000)
 max_bars_back(high, 5000)
@@ -126,7 +129,7 @@ float p_gamma_val_manual = p_gamma_drawer_sel == "Çekmece 1" ? p_gamma_opt : p_
 float v_gamma_val_manual = v_gamma_drawer_sel == "Çekmece 1" ? v_gamma_opt : v_gamma_drawer_sel == "Çekmece 2" ? v_gamma_opt_2 : v_gamma_drawer_sel == "Çekmece 3" ? v_gamma_opt_3 : v_gamma_drawer_sel == "Çekmece 4" ? v_gamma_opt_4 : v_gamma_opt_5
 
 // 3. Anchor & Lookback State
-int lb_input = lb_mode == "Global (Maksimum)" ? 4990 : lb_mode == "Otomatik (Hassasiyet)" ? lb_sens * 81 : auto_lookback
+int lb_input = lb_input_val
 int eff_lb = math.min(math.max(1, lb_input), bar_index + 1)
 
 // Optimization: Dynamic lookback calls to handle short history (e.g., Monthly timeframe)
