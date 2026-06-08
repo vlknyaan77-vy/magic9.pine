@@ -353,30 +353,33 @@ var label lv = na
 var line llin_p = na
 var line llin_v = na
 
-int p_idx_label = settled_p_idx
-int v_idx_label = settled_v_idx
+if barstate.islast
+    int p_idx_label = settled_p_idx
+    int v_idx_label = settled_v_idx
 
-if not na(p_idx_label)
-    if na(lp)
-        lp := label.new(p_idx_label, high[bar_index - p_idx_label], "⚓ Tepe", color=peak_color, textcolor=color.white, style=label.style_label_down)
-        if lb_mode == "Manuel (Ofset)"
-            llin_p := line.new(p_idx_label, low[bar_index - p_idx_label], p_idx_label, high[bar_index - p_idx_label], extend=extend.both, color=color.new(peak_color, 50), style=line.style_dashed)
-    else
-        label.set_xy(lp, p_idx_label, high[bar_index - p_idx_label])
-        if not na(llin_p)
-            line.set_xy1(llin_p, p_idx_label, low[bar_index - p_idx_label])
-            line.set_xy2(llin_p, p_idx_label, high[bar_index - p_idx_label])
+    if not na(p_idx_label)
+        int h_off = math.max(0, math.min(4999, bar_index - p_idx_label))
+        if na(lp)
+            lp := label.new(p_idx_label, high[h_off], "⚓ Tepe", color=peak_color, textcolor=color.white, style=label.style_label_down)
+            if lb_mode == "Manuel (Ofset)"
+                llin_p := line.new(p_idx_label, low[h_off], p_idx_label, high[h_off], extend=extend.both, color=color.new(peak_color, 50), style=line.style_dashed)
+        else
+            label.set_xy(lp, p_idx_label, high[h_off])
+            if not na(llin_p)
+                line.set_xy1(llin_p, p_idx_label, low[h_off])
+                line.set_xy2(llin_p, p_idx_label, high[h_off])
 
-if not na(v_idx_label)
-    if na(lv)
-        lv := label.new(v_idx_label, low[bar_index - v_idx_label], "⚓ Dip", color=valley_color, textcolor=color.white, style=label.style_label_up)
-        if lb_mode == "Manuel (Ofset)"
-            llin_v := line.new(v_idx_label, low[bar_index - v_idx_label], v_idx_label, high[bar_index - v_idx_label], extend=extend.both, color=color.new(valley_color, 50), style=line.style_dashed)
-    else
-        label.set_xy(lv, v_idx_label, low[bar_index - v_idx_label])
-        if not na(llin_v)
-            line.set_xy1(llin_v, v_idx_label, low[bar_index - v_idx_label])
-            line.set_xy2(llin_v, v_idx_label, high[bar_index - v_idx_label])
+    if not na(v_idx_label)
+        int v_off = math.max(0, math.min(4999, bar_index - v_idx_label))
+        if na(lv)
+            lv := label.new(v_idx_label, low[v_off], "⚓ Dip", color=valley_color, textcolor=color.white, style=label.style_label_up)
+            if lb_mode == "Manuel (Ofset)"
+                llin_v := line.new(v_idx_label, low[v_off], v_idx_label, high[v_off], extend=extend.both, color=color.new(valley_color, 50), style=line.style_dashed)
+        else
+            label.set_xy(lv, v_idx_label, low[v_off])
+            if not na(llin_v)
+                line.set_xy1(llin_v, v_idx_label, low[v_off])
+                line.set_xy2(llin_v, v_idx_label, high[v_off])
 
 
 alertcondition(settled_p_idx != settled_p_idx[1], "Yeni Tepe", "Otomatik çapa yeni bir tepe noktasına sabitlendi!")
