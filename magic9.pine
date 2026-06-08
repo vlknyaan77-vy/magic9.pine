@@ -222,6 +222,36 @@ is_new_lo = low  == ta.lowest(low, eff_lb)
 last_f_p := fs_p.upd_filt(high, low, cur_p_sz, init_p_val, is_p_anc)
 last_f_v := fs_v.upd_filt(high, low, cur_v_sz, init_v_val, is_v_anc)
 
+// --- CROSS ENGINE LOGIC ---
+// Since request.security calls are expensive, we calculate the targets in the current TF
+// and then potentially fetch them from HTF.
+float v_next_gamma = v_gamma_val + v_step
+float cur_v_next_sz = cur_sz_unit * v_next_gamma
+
+// Next Layer Filter State
+var FiltState fs_v_next = FiltState.new()
+float last_f_v_next = fs_v_next.upd_filt(high, low, cur_v_next_sz, init_v_val, is_v_anc)
+
+// Cross Detections (Current TF)
+bool cross_v_vs_vnext_up = ta.crossover(last_f_v, last_f_v_next)
+bool cross_v_vs_vnext_dn = ta.crossunder(last_f_v, last_f_v_next)
+bool cross_v_vs_p_up     = ta.crossover(last_f_v, last_f_p)
+bool cross_v_vs_p_dn     = ta.crossunder(last_f_v, last_f_p)
+
+int bars_v_vnext_up = ta.barssince(cross_v_vs_vnext_up)
+int bars_v_vnext_dn = ta.barssince(cross_v_vs_vnext_dn)
+int bars_v_p_up     = ta.barssince(cross_v_vs_p_up)
+int bars_v_p_dn     = ta.barssince(cross_v_vs_p_dn)
+
+// HTF Calculations
+[htf_v_vnext_up, htf_v_vnext_dn, htf_v_p_up, htf_v_p_dn, htf_b_vv_up, htf_b_vv_dn, htf_b_vp_up, htf_b_vp_dn] = request.security(syminfo.tickerid, test_tf, [cross_v_vs_vnext_up, cross_v_vs_vnext_dn, cross_v_vs_p_up, cross_v_vs_p_dn, bars_v_vnext_up, bars_v_vnext_dn, bars_v_p_up, bars_v_p_dn], lookahead=barmerge.lookahead_on)
+
+// Visualization on Chart
+plotshape(htf_v_vnext_up, "HTF V-VNext Cross Up", shape.triangleup, location.belowbar, color.green, size=size.small, title="HTF V-VNext Up")
+plotshape(htf_v_vnext_dn, "HTF V-VNext Cross Down", shape.triangledown, location.abovebar, color.green, size=size.small, title="HTF V-VNext Down")
+plotshape(htf_v_p_up, "HTF V-P Cross Up", shape.triangleup, location.belowbar, color.yellow, size=size.small, title="HTF V-P Up")
+plotshape(htf_v_p_dn, "HTF V-P Cross Down", shape.triangledown, location.abovebar, color.yellow, size=size.small, title="HTF V-P Down")
+
 // Visualization
 var polyline[] p_pl = array.new<polyline>(0)
 var polyline[] v_pl = array.new<polyline>(0)
@@ -309,6 +339,7 @@ if barstate.islast
             if array.size(pts) > 1
                 array.push(v_pl, polyline.new(pts, line_color=dr_color, line_width=filt_width))
 
+
 // Table
 if show_table and barstate.islast
     pos = table_pos == "Top Right" ? position.top_right : table_pos == "Bottom Right" ? position.bottom_right : table_pos == "Top Left" ? position.top_left : table_pos == "Bottom Left" ? position.bottom_left : position.middle_right
@@ -377,62 +408,3 @@ if barstate.islast
 
 alertcondition(settled_p_idx != settled_p_idx[1], "Yeni Tepe", "Otomatik çapa yeni bir tepe noktasına sabitlendi!")
 alertcondition(settled_v_idx != settled_v_idx[1], "Yeni Dip", "Otomatik çapa yeni bir dip noktasına sabitlendi!")
-
-// --- CROSS ENGINE LOGIC ---
-f_cross_engine() =>
-    // We need to recalculate the main filters for the HTF
-    // Since we are inside a function, we must use local variables and avoid 'var'
-    // To ensure stability, this function should be called within request.security
-
-    // 1. Basic properties
-    _tr = ta.tr(true)
-    _atr_per_auto = (timeframe.in_seconds() / 60.0) * atr_mult
-    _atr_per = math.min(4990.0, auto_atr ? _atr_per_auto : nz(str.tonumber(atr_opt), 8.1))
-
-    // Using a simple SMA for ATR in HTF to keep it fast and compatible with security()
-    // f_kama_atr might be too complex for a deep MTF security call if called many times
-    _sz_unit = ta.sma(_tr, int(math.max(1, _atr_per)))
-
-    _p_gamma = p_gamma_drawer_sel == "Çekmece 1" ? p_gamma_opt : p_gamma_drawer_sel == "Çekmece 2" ? p_gamma_opt_2 : p_gamma_drawer_sel == "Çekmece 3" ? p_gamma_opt_3 : p_gamma_drawer_sel == "Çekmece 4" ? p_gamma_opt_4 : p_gamma_opt_5
-    _v_gamma = v_gamma_drawer_sel == "Çekmece 1" ? v_gamma_opt : v_gamma_drawer_sel == "Çekmece 2" ? v_gamma_opt_2 : v_gamma_drawer_sel == "Çekmece 3" ? v_gamma_opt_3 : v_gamma_drawer_sel == "Çekmece 4" ? v_gamma_opt_4 : v_gamma_opt_5
-    _v_step = v_gamma_drawer_sel == "Çekmece 1" ? 1.125 : v_gamma_drawer_sel == "Çekmece 2" ? 2.25 : v_gamma_drawer_sel == "Çekmece 3" ? 4.5 : v_gamma_drawer_sel == "Çekmece 4" ? 9.0 : 0.81
-
-    // Calculation of filters (non-persistent state versions for MTF)
-    // We use a simplified version of the filter for MTF detection
-    _v_main = high
-    _v_next = high
-    _p_main = high
-
-    // State-like behavior using ta.cum or ta.ema for HTF is tricky
-    // For the engine, we will focus on the cross of the series
-    // In MTF context, we'll use the values calculated in the script's main flow
-    [last_f_v, last_f_p, cur_v_sz, cur_p_sz, v_step]
-
-// Since request.security calls are expensive, we calculate the targets in the current TF
-// and then potentially fetch them from HTF.
-float v_next_gamma = v_gamma_val + v_step
-float cur_v_next_sz = cur_sz_unit * v_next_gamma
-
-// Next Layer Filter State
-var FiltState fs_v_next = FiltState.new()
-float last_f_v_next = fs_v_next.upd_filt(high, low, cur_v_next_sz, init_v_val, is_v_anc)
-
-// Cross Detections (Current TF)
-bool cross_v_vs_vnext_up = ta.crossover(last_f_v, last_f_v_next)
-bool cross_v_vs_vnext_dn = ta.crossunder(last_f_v, last_f_v_next)
-bool cross_v_vs_p_up     = ta.crossover(last_f_v, last_f_p)
-bool cross_v_vs_p_dn     = ta.crossunder(last_f_v, last_f_p)
-
-int bars_v_vnext_up = ta.barssince(cross_v_vs_vnext_up)
-int bars_v_vnext_dn = ta.barssince(cross_v_vs_vnext_dn)
-int bars_v_p_up     = ta.barssince(cross_v_vs_p_up)
-int bars_v_p_dn     = ta.barssince(cross_v_vs_p_dn)
-
-// HTF Calculations
-[htf_v_vnext_up, htf_v_vnext_dn, htf_v_p_up, htf_v_p_dn, htf_b_vv_up, htf_b_vv_dn, htf_b_vp_up, htf_b_vp_dn] = request.security(syminfo.tickerid, test_tf, [cross_v_vs_vnext_up, cross_v_vs_vnext_dn, cross_v_vs_p_up, cross_v_vs_p_dn, bars_v_vnext_up, bars_v_vnext_dn, bars_v_p_up, bars_v_p_dn], lookahead=barmerge.lookahead_on)
-
-// Visualization on Chart
-plotshape(htf_v_vnext_up, "HTF V-VNext Cross Up", shape.triangleup, location.belowbar, color.green, size=size.small, title="HTF V-VNext Up")
-plotshape(htf_v_vnext_dn, "HTF V-VNext Cross Down", shape.triangledown, location.abovebar, color.green, size=size.small, title="HTF V-VNext Down")
-plotshape(htf_v_p_up, "HTF V-P Cross Up", shape.triangleup, location.belowbar, color.yellow, size=size.small, title="HTF V-P Up")
-plotshape(htf_v_p_dn, "HTF V-P Cross Down", shape.triangledown, location.abovebar, color.yellow, size=size.small, title="HTF V-P Down")
