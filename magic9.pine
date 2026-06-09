@@ -249,10 +249,10 @@ int bars_v_p_dn     = ta.barssince(cross_v_vs_p_dn)
 [htf_v_vnext_up, htf_v_vnext_dn, htf_v_p_up, htf_v_p_dn, htf_b_vv_up, htf_b_vv_dn, htf_b_vp_up, htf_b_vp_dn] = request.security(syminfo.tickerid, test_tf, [cross_v_vs_vnext_up, cross_v_vs_vnext_dn, cross_v_vs_p_up, cross_v_vs_p_dn, bars_v_vnext_up, bars_v_vnext_dn, bars_v_p_up, bars_v_p_dn], lookahead=barmerge.lookahead_on)
 
 // Visualization on Chart
-plotshape(htf_v_vnext_up, shape=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="HTF V-VNext Up")
-plotshape(htf_v_vnext_dn, shape=shape.triangledown, location=location.abovebar, color=color.green, size=size.small, title="HTF V-VNext Down")
-plotshape(htf_v_p_up, shape=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.small, title="HTF V-P Up")
-plotshape(htf_v_p_dn, shape=shape.triangledown, location=location.abovebar, color=color.yellow, size=size.small, title="HTF V-P Down")
+plotshape(htf_v_vnext_up, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="HTF V-VNext Up")
+plotshape(htf_v_vnext_dn, style=shape.triangledown, location=location.abovebar, color=color.green, size=size.small, title="HTF V-VNext Down")
+plotshape(htf_v_p_up, style=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.small, title="HTF V-P Up")
+plotshape(htf_v_p_dn, style=shape.triangledown, location=location.abovebar, color=color.yellow, size=size.small, title="HTF V-P Down")
 
 // Visualization
 var polyline[] p_pl = array.new<polyline>(0)
